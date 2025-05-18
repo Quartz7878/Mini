@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Card Flip Game</title>
+    <style>
+        :root {
+            --card-size: 80px;
+            --card-border-radius: 8px;
+            --primary-color: #4a6fa5;
+            --secondary-color: #6bbaa7;
+            --bg-color: #f9f9f9;
+            --card-back: #b8c6db;
+            --card-front: #ffffff;
+            --text-color: #333333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+
+        .moves {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .best-score {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 10px;
+            margin: 20px auto;
+            max-width: 400px;
+        }
+
+        .card {
+            height: var(--card-size);
+            width: var(--card-size);
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: pointer;
+            margin: 0 auto;
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: var(--card-border-radius);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-front {
+            background-color: var(--card-front);
+            transform: rotateY(180deg);
+            font-size: 2em;
+        }
+
+        .card-back {
+            background-color: var(--card-back);
+            background-image: linear-gradient(315deg, var(--card-back) 0%, var(--primary-color) 74%);
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 10px 5px;
+        }
+
+        .btn:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .winner-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .winner-message.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .winner-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .winner-content h2 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .winner-content p {
+            margin-bottom: 20px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 480px) {
+            :root {
+                --card-size: 65px;
+            }
+            
+            .game-grid {
+                grid-gap: 8px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .game-info {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 350px) {
+            :root {
+                --card-size: 55px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Memory Card Game</h1>
+        
+        <div class="game-info">
+            <div>Moves: <span class="moves">0</span></div>
+            <div>Best Score: <span class="best-score">-</span></div>
+        </div>
+        
+        <div class="game-grid"></div>
+        
+        <button class="btn reset-btn">Reset Game</button>
+    </div>
+    
+    <div class="winner-message">
+        <div class="winner-content">
+            <h2>You Win! 🎉</h2>
+            <p>You completed the game in <span class="final-moves">0</span> moves!</p>
+            <button class="btn play-again-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Game elements
+            const gameGrid = document.querySelector('.game-grid');
+            const movesDisplay = document.querySelector('.moves');
+            const bestScoreDisplay = document.querySelector('.best-score');
+            const resetButton = document.querySelector('.reset-btn');
+            const winnerMessage = document.querySelector('.winner-message');
+            const finalMovesDisplay = document.querySelector('.final-moves');
+            const playAgainButton = document.querySelector('.play-again-btn');
+            
+            // Game state
+            let cards = [];
+            let flippedCards = [];
+            let matchedPairs = 0;
+            let moves = 0;
+            let isProcessing = false;
+            let bestScore = localStorage.getItem('memoryGameBestScore') || Infinity;
+            
+            // Display best score if available
+            if (bestScore !== Infinity) {
+                bestScoreDisplay.textContent = bestScore;
+            }
+            
+            // Emojis for card pairs
+            const emojis = ['🐱', '🐶', '🐼', '🦊', '🦁', '🐵', '🐸', '🦄'];
+            
+            // Initialize the game
+            function initGame() {
+                resetGameState();
+                createCards();
+                updateMovesDisplay();
+            }
+            
+            // Reset game state
+            function resetGameState() {
+                cards = [];
+                flippedCards = [];
+                matchedPairs = 0;
+                moves = 0;
+                isProcessing = false;
+                gameGrid.innerHTML = '';
+                winnerMessage.classList.remove('show');
+            }
+            
+            // Create and shuffle cards
+            function createCards() {
+                const cardPairs = [...emojis, ...emojis];
+                shuffleArray(cardPairs);
+                
+                cardPairs.forEach((emoji, index) => {
+                    const card = createCardElement(emoji, index);
+                    cards.push(card);
+                    gameGrid.appendChild(card);
+                });
+            }
+            
+            // Shuffle array using Fisher-Yates algorithm
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+            
+            // Create a card element
+            function createCardElement(emoji, index) {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.index = index;
+                card.dataset.value = emoji;
+                
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-face', 'card-front');
+                cardFront.textContent = emoji;
+                
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-face', 'card-back');
+                
+                card.appendChild(cardFront);
+                card.appendChild(cardBack);
+                
+                card.addEventListener('click', flipCard);
+                
+                return card;
+            }
+            
+            // Handle card flip
+            function flipCard() {
+                const selectedCard = this;
+                
+                // Prevent flipping if:
+                // 1. Currently processing a match/mismatch
+                // 2. Card is already flipped
+                // 3. Two cards are already flipped
+                // 4. Clicked card is already matched
+                if (
+                    isProcessing || 
+                    selectedCard.classList.contains('flipped') || 
+                    flippedCards.length >= 2 ||
+                    selectedCard.classList.contains('matched')
+                ) {
+                    return;
+                }
+                
+                // Flip the card
+                selectedCard.classList.add('flipped');
+                flippedCards.push(selectedCard);
+                
+                // Check for match if two cards are flipped
+                if (flippedCards.length === 2) {
+                    moves++;
+                    updateMovesDisplay();
+                    
+                    const card1 = flippedCards[0];
+                    const card2 = flippedCards[1];
+                    
+                    // Check if cards match
+                    if (card1.dataset.value === card2.dataset.value) {
+                        handleMatchedCards();
+                    } else {
+                        handleMismatchedCards();
+                    }
+                }
+            }
+            
+            // Handle matched cards
+            function handleMatchedCards() {
+                flippedCards.forEach(card => {
+                    card.classList.add('matched');
+                    card.removeEventListener('click', flipCard);
+                });
+                
+                matchedPairs++;
+                flippedCards = [];
+                
+                // Check if game is complete
+                if (matchedPairs === emojis.length) {
+                    setTimeout(showWinMessage, 500);
+                }
+            }
+            
+            // Handle mismatched cards
+            function handleMismatchedCards() {
+                isProcessing = true;
+                
+                setTimeout(() => {
+                    flippedCards.forEach(card => {
+                        card.classList.remove('flipped');
+                    });
+                    
+                    flippedCards = [];
+                    isProcessing = false;
+                }, 1000);
+            }
+            
+            // Update moves display
+            function updateMovesDisplay() {
+                movesDisplay.textContent = moves;
+            }
+            
+            // Show win message
+            function showWinMessage() {
+                finalMovesDisplay.textContent = moves;
+                winnerMessage.classList.add('show');
+                
+                // Update best score if current score is better
+                if (moves < bestScore) {
+                    bestScore = moves;
+                    localStorage.setItem('memoryGameBestScore', bestScore);
+                    bestScoreDisplay.textContent = bestScore;
+                }
+            }
+            
+            // Event listeners
+            resetButton.addEventListener('click', initGame);
+            playAgainButton.addEventListener('click', initGame);
+            
+            // Start the game
+            initGame();
+        });
+    </script>
+</body>
+</html>
